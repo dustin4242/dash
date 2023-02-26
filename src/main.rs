@@ -10,9 +10,10 @@ fn main() -> Result<(), Error> {
     let mut term = console::Term::stdout();
     let mut input = String::new();
     let mut index = 0;
+    let mut current_directory = get_dir();
     loop {
         term.clear_line()?;
-        term.write_all(b"> ")?;
+        term.write_all((current_directory.to_owned() + "> ").as_bytes())?;
         term.write_all(input.as_bytes())?;
         match term.read_key()? {
             console::Key::Char(x) => {
@@ -62,6 +63,7 @@ fn main() -> Result<(), Error> {
                         if let Err(e) = env::set_current_dir(&root) {
                             eprintln!("{}", e);
                         }
+                        current_directory = get_dir();
                     }
                     "exit" => return Ok(()),
                     command => {
@@ -75,9 +77,22 @@ fn main() -> Result<(), Error> {
                     }
                 }
                 input = String::new();
-                term.write_all(b"> ")?;
+                term.write_all(("\n".to_string() + current_directory.as_str() + "> ").as_bytes())?;
             }
             _ => (),
         };
     }
+}
+
+// I just really dont want to look at this.
+// And neither do you lets be honest.
+fn get_dir() -> String {
+    env::current_dir()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split("/")
+        .last()
+        .unwrap()
+        .to_string()
 }
