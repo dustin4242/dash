@@ -26,17 +26,26 @@ fn main() -> Result<(), Error> {
                 }
             }
             console::Key::ArrowUp => {
-                if cache.len() >= index + 1 {
+                if index == 0 && cache.len() >= index + 1 {
+                    cache.insert(0, input.to_string());
+                    index += 2;
+                    input = cache[index - 1].to_owned();
+                } else if cache.len() >= index + 1 {
                     index += 1;
                     input = cache[index - 1].to_owned();
                 }
             }
-            console::Key::ArrowDown => {
-                if index != 1 {
+            console::Key::ArrowDown => match index {
+                2 => {
+                    index -= 2;
+                    input = cache.remove(0);
+                }
+                0 => (),
+                _ => {
                     index -= 1;
                     input = cache[index - 1].to_owned();
                 }
-            }
+            },
             console::Key::Enter => {
                 index = 0;
                 term.write_all(b"\n")?;
