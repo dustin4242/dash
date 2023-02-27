@@ -10,20 +10,24 @@ fn main() -> Result<(), Error> {
     let mut term = console::Term::stdout();
     let mut input = String::new();
     let mut index = 0;
+    let mut pos = 0;
     let mut current_directory = get_dir();
     loop {
         term.clear_line()?;
         term.write_all((current_directory.to_owned() + "> ").as_bytes())?;
         term.write_all(input.as_bytes())?;
+        term.move_cursor_left(input.len() - pos)?;
         match term.read_key()? {
             console::Key::Char(x) => {
                 term.write_all(x.to_string().as_bytes())?;
-                input.insert(input.len(), x)
+                input.insert(pos, x);
+                pos += 1;
             }
             console::Key::Backspace => {
-                if input != "".to_string() {
-                    input.pop();
+                if pos != 0 {
+                    input.remove(pos - 1);
                     term.clear_chars(1)?;
+                    pos -= 1;
                 }
             }
             console::Key::ArrowUp => {
@@ -31,30 +35,44 @@ fn main() -> Result<(), Error> {
                     cache.insert(0, input.to_string());
                     index += 2;
                     input = cache[index - 1].to_owned();
+                    pos = input.len();
                 } else if cache.len() >= index + 1 {
                     index += 1;
                     input = cache[index - 1].to_owned();
+                    pos = input.len();
                 }
             }
             console::Key::ArrowDown => match index {
                 2 => {
                     index -= 2;
                     input = cache.remove(0);
+                    pos = input.len();
                 }
                 0 => (),
                 _ => {
                     index -= 1;
                     input = cache[index - 1].to_owned();
+                    pos = input.len();
                 }
             },
+            console::Key::ArrowLeft => {
+                if pos != 0 {
+                    pos -= 1;
+                }
+            }
+            console::Key::ArrowRight => {
+                if pos != input.len() {
+                    pos += 1;
+                }
+            }
             console::Key::Enter => {
                 index = 0;
+                pos = 0;
                 term.write_all(b"\n")?;
                 cache.insert(0, input.to_owned());
                 let mut parts = input.trim().split_whitespace();
                 let command = parts.next().unwrap_or("");
                 let args = parts;
-
                 match command {
                     "" => (),
                     "cd" => {
