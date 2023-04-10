@@ -14,7 +14,14 @@ fn main() -> Result<(), Error> {
     let mut current_directory = get_dir();
     loop {
         term.clear_line()?;
-        term.write_all((current_directory.to_owned() + "> ").as_bytes())?;
+        term.write_all(
+            format!(
+                "\x1b[32;40m{}\x1b[37;40m {}> ",
+                env::var("USER").unwrap(),
+                current_directory.to_owned()
+            )
+            .as_bytes(),
+        )?;
         term.write_all(input.as_bytes())?;
         term.move_cursor_left(input.len() - pos)?;
         match term.read_key()? {
