@@ -102,7 +102,7 @@ fn main() -> Result<(), Error> {
                     }
                 }
                 input = String::new();
-                term.write_all(("\n".to_string() + current_directory.as_str() + "> ").as_bytes())?;
+                term.write_all((current_directory.as_str() + "> ").as_bytes())?;
             }
             _ => (),
         };
