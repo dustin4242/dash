@@ -75,12 +75,12 @@ fn main() -> Result<(), Error> {
                 index = 0;
                 pos = 0;
                 term.write_all(b"\n")?;
-                if cache.get(0).unwrap_or(&"".to_owned()) != &input.to_owned() {
-                    cache.insert(0, input.to_owned());
-                }
                 let mut parts = input.trim().split_whitespace();
                 let command = parts.next().unwrap_or("");
                 let args = parts;
+                if cache.get(0).unwrap_or(&"".to_owned()) != &input.to_owned() || input != "" {
+                    cache.insert(0, input.to_owned());
+                }
                 match command {
                     "" => (),
                     "cd" => {
