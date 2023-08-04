@@ -39,8 +39,7 @@ fn main() -> Result<(), Error> {
             }
             console::Key::ArrowUp => {
                 if index == 0 && cache.len() >= index + 1 {
-                    cache.insert(0, input.to_string());
-                    index += 2;
+                    index += 1;
                     input = cache[index - 1].to_owned();
                     pos = input.len();
                 } else if cache.len() >= index + 1 {
@@ -50,12 +49,12 @@ fn main() -> Result<(), Error> {
                 }
             }
             console::Key::ArrowDown => match index {
-                2 => {
-                    index -= 2;
-                    input = cache.remove(0);
-                    pos = input.len();
-                }
                 0 => (),
+                1 => {
+                    index -= 1;
+                    input = "".to_owned();
+                    pos = 0;
+                }
                 _ => {
                     index -= 1;
                     input = cache[index - 1].to_owned();
@@ -76,7 +75,9 @@ fn main() -> Result<(), Error> {
                 index = 0;
                 pos = 0;
                 term.write_all(b"\n")?;
-                cache.insert(0, input.to_owned());
+                if cache.get(0).unwrap_or(&"".to_owned()) != &input.to_owned() {
+                    cache.insert(0, input.to_owned());
+                }
                 let mut parts = input.trim().split_whitespace();
                 let command = parts.next().unwrap_or("");
                 let args = parts;
