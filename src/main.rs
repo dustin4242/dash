@@ -110,7 +110,11 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
-                self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
+                if self.input.trim_end() != "" {
+                    self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
+                } else {
+                    self.suggestion = String::new();
+                }
             }
             console::Key::Tab => {
                 if self.highlighting {
@@ -138,7 +142,7 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
-                if self.pos != 0 {
+                if self.input.trim_end() != "" {
                     self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
                 } else {
                     self.suggestion = String::new();
