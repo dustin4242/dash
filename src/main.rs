@@ -32,6 +32,9 @@ fn main() -> Result<(), Error> {
                 term.clear_line()?;
                 let temp_input = input.split(" ").last().unwrap();
                 let mut pos = 0;
+                if highlighted_entry.0 == len {
+                    highlighted_entry.0 = 0;
+                }
                 entries.into_iter().for_each(|x| {
                     let mut entry = x.unwrap().file_name().into_string().unwrap();
                     match highlighting {
@@ -55,11 +58,9 @@ fn main() -> Result<(), Error> {
                     }
                     pos += 1;
                 });
-                if highlighted_entry.0 == len - 1 {
-                    highlighting = false;
-                    highlighted_entry.0 = 0;
-                }
                 term.move_cursor_up(1)?;
+            } else {
+                (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
             }
         }
         term.clear_line()?;
