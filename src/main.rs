@@ -120,10 +120,16 @@ impl Shell {
                 if self.highlighting {
                     self.highlighted_entry.0 += 1;
                 }
-                if !self.showing_entries {
-                    self.showing_entries = true;
+                if self.suggestion.trim() == "" {
+                    if !self.showing_entries {
+                        self.showing_entries = true;
+                    } else {
+                        self.highlighting = true;
+                    }
                 } else {
-                    self.highlighting = true;
+                    self.input = format!("{}{}", self.input, self.suggestion);
+                    self.pos += self.suggestion.len();
+                    self.suggestion = String::new();
                 }
             }
             console::Key::Backspace => {
