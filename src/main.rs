@@ -295,12 +295,20 @@ fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
 fn get_suggestion(path: String, input: String) -> String {
     let mut possible_suggestions = Vec::new();
     path.split(":").for_each(|x| {
-        let filtered = match dir_filter(input.to_owned(), std::fs::read_dir(x).unwrap()).get(0) {
+        let mut filtered = dir_filter(input.to_owned(), std::fs::read_dir(x).unwrap());
+        filtered.sort_by(|a, b| {
+            a.as_ref()
+                .unwrap()
+                .file_name()
+                .partial_cmp(&b.as_ref().unwrap().file_name())
+                .unwrap()
+        });
+        let value = match filtered.get(0) {
             Some(x) => x.as_ref().unwrap().file_name().into_string().unwrap(),
             None => String::new(),
         };
-        if filtered != String::new() {
-            possible_suggestions.push(filtered);
+        if value != String::new() {
+            possible_suggestions.push(value);
         }
     });
     possible_suggestions.sort();
