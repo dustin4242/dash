@@ -13,6 +13,8 @@ fn main() -> Result<(), Error> {
     let mut term = console::Term::stdout();
     let mut current_directory = get_dir();
     let mut showing_entries = false;
+    let mut suggestion = "";
+    let path = std::env::var("PATH").unwrap().split(":");
     loop {
         if showing_entries {
             let dir = std::fs::read_dir("./")?;
@@ -195,7 +197,13 @@ fn main() -> Result<(), Error> {
                                 Ok(mut child) => {
                                     child.wait()?;
                                 }
-                                Err(e) => eprintln!("{}", e),
+                                Err(e) => {
+                                    if e.raw_os_error().unwrap() == 2 {
+                                        eprintln!("Unknown Command: \"{command}\"");
+                                    } else {
+                                        eprintln!("{}", e);
+                                    }
+                                }
                             };
                         }
                     }
