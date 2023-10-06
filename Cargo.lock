@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "db-shell"
+name = "dash"
 version = "0.1.0"
 dependencies = [
  "console",
