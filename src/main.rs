@@ -138,7 +138,11 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
-                self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
+                if self.pos != 0 {
+                    self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
+                } else {
+                    self.suggestion = String::new();
+                }
             }
             console::Key::ArrowUp => {
                 if self.index == 0 && self.cache.len() >= self.index + 1 {
