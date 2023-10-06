@@ -89,8 +89,12 @@ impl Shell {
             .unwrap();
         self.term.write_all(self.input.as_bytes()).unwrap();
         self.term
-            .move_cursor_left(self.input.len() - self.pos)
+            .write_all(format!("\x1b[38;5;240m{}\x1b[37m", self.suggestion).as_bytes())
             .unwrap();
+        self.term
+            .move_cursor_left(self.input.len() + self.suggestion.len() - self.pos)
+            .unwrap();
+
         match self.term.read_key().unwrap() {
             console::Key::Char(x) => {
                 self.term.write_all(x.to_string().as_bytes()).unwrap();
@@ -106,6 +110,7 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
+                self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
             }
             console::Key::Tab => {
                 if self.highlighting {
@@ -133,6 +138,7 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
+                self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
             }
             console::Key::ArrowUp => {
                 if self.index == 0 && self.cache.len() >= self.index + 1 {
@@ -173,6 +179,7 @@ impl Shell {
                     self.term.move_cursor_down(1).unwrap();
                     self.term.clear_line().unwrap();
                     self.term.move_cursor_up(1).unwrap();
+                    self.suggestion = String::new();
                     let mut temp_input = self.input.split(" ").collect::<Vec<&str>>();
                     temp_input.pop();
                     let dir = std::fs::read_dir("./").unwrap();
@@ -189,6 +196,9 @@ impl Shell {
                 } else {
                     self.index = 0;
                     self.pos = 0;
+                    self.term.move_cursor_right(self.suggestion.len()).unwrap();
+                    self.term.clear_chars(self.suggestion.len()).unwrap();
+                    self.suggestion = String::new();
                     self.term.write_all(b"\n").unwrap();
                     let mut parts = self.input.trim().split_whitespace();
                     let command = parts.next().unwrap_or("");
@@ -281,4 +291,31 @@ fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
             .starts_with(&input.split(" ").last().unwrap())
     })
     .collect::<Vec<Result<DirEntry, Error>>>()
+}
+fn get_suggestion(path: String, input: String) -> String {
+    let mut possible_suggestions = Vec::new();
+    path.split(":").for_each(|x| {
+        let filtered = match dir_filter(input.to_owned(), std::fs::read_dir(x).unwrap()).get(0) {
+            Some(x) => x.as_ref().unwrap().file_name().into_string().unwrap(),
+            None => String::new(),
+        };
+        if filtered != String::new() {
+            possible_suggestions.push(filtered);
+        }
+    });
+    possible_suggestions.sort();
+    if possible_suggestions
+        .get(0)
+        .unwrap_or(&String::new())
+        .to_owned()
+        != String::new()
+    {
+        let possible = possible_suggestions.get(0).unwrap().to_owned();
+        return possible
+            .get(input.split(" ").last().unwrap().len()..possible.len())
+            .unwrap()
+            .to_string();
+    } else {
+        return String::new();
+    }
 }
