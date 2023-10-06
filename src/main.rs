@@ -1,184 +1,202 @@
 use std::{
     env,
-    fs::DirEntry,
+    ffi::OsString,
+    fs::{DirEntry, ReadDir},
     io::{Error, Write},
     path::Path,
     process::Command,
 };
 
 fn main() -> Result<(), Error> {
-    let (mut cache, mut input) = (Vec::<String>::new(), String::new());
-    let (mut highlighting, mut highlighted_entry) = (false, (0, 0));
-    let (mut index, mut pos) = (0, 0);
-    let mut term = console::Term::stdout();
-    let mut current_directory = get_dir();
-    let mut showing_entries = false;
-    let mut suggestion = "";
-    let path = std::env::var("PATH").unwrap().split(":");
+    let mut shell = Shell::new();
     loop {
-        if showing_entries {
-            let dir = std::fs::read_dir("./")?;
-            let entries = dir
-                .filter(|x| {
-                    x.as_ref()
-                        .unwrap()
-                        .file_name()
-                        .into_string()
-                        .unwrap()
-                        .starts_with(&input.split(" ").last().unwrap())
-                })
-                .collect::<Vec<Result<DirEntry, Error>>>();
+        shell.tick();
+    }
+}
+
+struct Shell {
+    term: console::Term,
+    path: String,
+    current_directory: String,
+    cache: Vec<String>,
+    input: String,
+    suggestion: String,
+    highlighting: bool,
+    showing_entries: bool,
+    highlighted_entry: (usize, usize),
+    index: usize,
+    pos: usize,
+}
+impl Shell {
+    fn tick(&mut self) {
+        if self.showing_entries {
+            let dir = std::fs::read_dir("./").unwrap();
+            let entries = dir_filter(self.input.to_owned(), dir);
             let len = entries.len();
             if len != 0 {
-                term.write_all(b"\n")?;
-                term.clear_line()?;
-                let temp_input = input.split(" ").last().unwrap();
+                self.term.write_all(b"\n").unwrap();
+                self.term.clear_line().unwrap();
+                let temp_input = self.input.split(" ").last().unwrap();
                 let mut pos = 0;
-                if highlighted_entry.0 == len {
-                    highlighted_entry.0 = 0;
+                if self.highlighted_entry.0 == len {
+                    self.highlighted_entry.0 = 0;
                 }
                 entries.into_iter().for_each(|x| {
                     let mut entry = x.unwrap().file_name().into_string().unwrap();
-                    match highlighting {
+                    match self.highlighting {
                         false => {
                             entry.insert_str(temp_input.len(), "\x1b[0;37m");
-                            term.write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
+                            self.term
+                                .write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
                                 .unwrap()
                         }
                         true => {
-                            if pos == highlighted_entry.0 {
-                                term.write_all(
-                                    format!("\x1b[30;46m{}\x1b[30;40m ", entry).as_bytes(),
-                                )
-                                .unwrap();
+                            if pos == self.highlighted_entry.0 {
+                                self.term
+                                    .write_all(
+                                        format!("\x1b[30;46m{}\x1b[30;40m ", entry).as_bytes(),
+                                    )
+                                    .unwrap();
                             } else {
                                 entry.insert_str(temp_input.len(), "\x1b[0;37m");
-                                term.write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
+                                self.term
+                                    .write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
                                     .unwrap()
                             }
                         }
                     }
                     pos += 1;
                 });
-                term.move_cursor_up(1)?;
+                self.term.move_cursor_up(1).unwrap();
             } else {
-                (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
+                (
+                    self.showing_entries,
+                    self.highlighting,
+                    self.highlighted_entry.0,
+                ) = (false, false, 0);
             }
         }
-        term.clear_line()?;
-        term.write_all(
-            format!(
-                "\x1b[32;40m{}\x1b[37;40m {}> ",
-                env::var("USER").unwrap(),
-                current_directory.to_owned()
+        self.term.clear_line().unwrap();
+        self.term
+            .write_all(
+                format!(
+                    "\x1b[32;40m{}\x1b[37;40m {}> ",
+                    env::var("USER").unwrap(),
+                    self.current_directory.to_owned()
+                )
+                .as_bytes(),
             )
-            .as_bytes(),
-        )?;
-        term.write_all(input.as_bytes())?;
-        term.move_cursor_left(input.len() - pos)?;
-        match term.read_key()? {
+            .unwrap();
+        self.term.write_all(self.input.as_bytes()).unwrap();
+        self.term
+            .move_cursor_left(self.input.len() - self.pos)
+            .unwrap();
+        match self.term.read_key().unwrap() {
             console::Key::Char(x) => {
-                term.write_all(x.to_string().as_bytes())?;
-                input.insert(pos, x);
-                pos += 1;
-                if showing_entries {
-                    term.move_cursor_down(1)?;
-                    term.clear_line()?;
-                    term.move_cursor_up(1)?;
-                    (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
+                self.term.write_all(x.to_string().as_bytes()).unwrap();
+                self.input.insert(self.pos, x);
+                self.pos += 1;
+                if self.showing_entries {
+                    self.term.move_cursor_down(1).unwrap();
+                    self.term.clear_line().unwrap();
+                    self.term.move_cursor_up(1).unwrap();
+                    (
+                        self.showing_entries,
+                        self.highlighting,
+                        self.highlighted_entry.0,
+                    ) = (false, false, 0);
                 }
             }
             console::Key::Tab => {
-                if highlighting {
-                    highlighted_entry.0 += 1;
+                if self.highlighting {
+                    self.highlighted_entry.0 += 1;
                 }
-                if !showing_entries {
-                    showing_entries = true;
+                if !self.showing_entries {
+                    self.showing_entries = true;
                 } else {
-                    highlighting = true;
+                    self.highlighting = true;
                 }
             }
             console::Key::Backspace => {
-                if pos != 0 {
-                    input.remove(pos - 1);
-                    term.clear_chars(1)?;
-                    pos -= 1;
+                if self.pos != 0 {
+                    self.input.remove(self.pos - 1);
+                    self.term.clear_chars(1).unwrap();
+                    self.pos -= 1;
                 }
-                if showing_entries {
-                    term.move_cursor_down(1)?;
-                    term.clear_line()?;
-                    term.move_cursor_up(1)?;
-                    (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
+                if self.showing_entries {
+                    self.term.move_cursor_down(1).unwrap();
+                    self.term.clear_line().unwrap();
+                    self.term.move_cursor_up(1).unwrap();
+                    (
+                        self.showing_entries,
+                        self.highlighting,
+                        self.highlighted_entry.0,
+                    ) = (false, false, 0);
                 }
             }
             console::Key::ArrowUp => {
-                if index == 0 && cache.len() >= index + 1 {
-                    index += 1;
-                    input = cache[index - 1].to_owned();
-                    pos = input.len();
-                } else if cache.len() >= index + 1 {
-                    index += 1;
-                    input = cache[index - 1].to_owned();
-                    pos = input.len();
+                if self.index == 0 && self.cache.len() >= self.index + 1 {
+                    self.index += 1;
+                    self.input = self.cache[self.index - 1].to_owned();
+                    self.pos = self.input.len();
+                } else if self.cache.len() >= self.index + 1 {
+                    self.index += 1;
+                    self.input = self.cache[self.index - 1].to_owned();
+                    self.pos = self.input.len();
                 }
             }
-            console::Key::ArrowDown => match index {
+            console::Key::ArrowDown => match self.index {
                 0 => (),
                 1 => {
-                    index -= 1;
-                    input = "".to_owned();
-                    pos = 0;
+                    self.index -= 1;
+                    self.input = "".to_owned();
+                    self.pos = 0;
                 }
                 _ => {
-                    index -= 1;
-                    input = cache[index - 1].to_owned();
-                    pos = input.len();
+                    self.index -= 1;
+                    self.input = self.cache[self.index - 1].to_owned();
+                    self.pos = self.input.len();
                 }
             },
             console::Key::ArrowLeft => {
-                if pos != 0 {
-                    pos -= 1;
+                if self.pos != 0 {
+                    self.pos -= 1;
                 }
             }
             console::Key::ArrowRight => {
-                if pos != input.len() {
-                    pos += 1;
+                if self.pos != self.input.len() {
+                    self.pos += 1;
                 }
             }
             console::Key::Enter => {
-                if showing_entries {
-                    term.move_cursor_down(1)?;
-                    term.clear_line()?;
-                    term.move_cursor_up(1)?;
-                    let mut temp_input = input.split(" ").collect::<Vec<&str>>();
+                if self.showing_entries {
+                    self.term.move_cursor_down(1).unwrap();
+                    self.term.clear_line().unwrap();
+                    self.term.move_cursor_up(1).unwrap();
+                    let mut temp_input = self.input.split(" ").collect::<Vec<&str>>();
                     temp_input.pop();
-                    let dir = std::fs::read_dir("./")?;
-                    let entry = dir
-                        .filter(|x| {
-                            x.as_ref()
-                                .unwrap()
-                                .file_name()
-                                .into_string()
-                                .unwrap()
-                                .starts_with(&input.split(" ").last().unwrap())
-                        })
-                        .nth(highlighted_entry.0)
-                        .unwrap()
-                        .unwrap()
-                        .file_name();
+                    let dir = std::fs::read_dir("./").unwrap();
+                    let entry =
+                        dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
                     temp_input.push(entry.to_str().unwrap());
-                    input = temp_input.join(" ");
-                    pos = input.len();
-                    (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
+                    self.input = temp_input.join(" ");
+                    self.pos = self.input.len();
+                    (
+                        self.showing_entries,
+                        self.highlighting,
+                        self.highlighted_entry.0,
+                    ) = (false, false, 0);
                 } else {
-                    index = 0;
-                    pos = 0;
-                    term.write_all(b"\n")?;
-                    let mut parts = input.trim().split_whitespace();
+                    self.index = 0;
+                    self.pos = 0;
+                    self.term.write_all(b"\n").unwrap();
+                    let mut parts = self.input.trim().split_whitespace();
                     let command = parts.next().unwrap_or("");
                     let args = parts;
-                    if cache.get(0).unwrap_or(&"".to_owned()) != &input.to_owned() || input != "" {
-                        cache.insert(0, input.to_owned());
+                    if self.cache.get(0).unwrap_or(&"".to_owned()) != &self.input.to_owned()
+                        || self.input != ""
+                    {
+                        self.cache.insert(0, self.input.to_owned());
                     }
                     match command {
                         "" => (),
@@ -188,14 +206,14 @@ fn main() -> Result<(), Error> {
                             if let Err(e) = env::set_current_dir(&root) {
                                 eprintln!("{}", e);
                             }
-                            current_directory = get_dir();
+                            self.current_directory = get_dir();
                         }
-                        "exit" => return Ok(()),
+                        "exit" => std::process::exit(0),
                         command => {
                             let child = Command::new(command).args(args).spawn();
                             match child {
                                 Ok(mut child) => {
-                                    child.wait()?;
+                                    child.wait().unwrap();
                                 }
                                 Err(e) => {
                                     if e.raw_os_error().unwrap() == 2 {
@@ -207,12 +225,29 @@ fn main() -> Result<(), Error> {
                             };
                         }
                     }
-                    input = String::new();
-                    term.write_all((current_directory.to_string() + "> ").as_bytes())?;
+                    self.input = String::new();
+                    self.term
+                        .write_all((self.current_directory.to_string() + "> ").as_bytes())
+                        .unwrap();
                 }
             }
             _ => (),
         };
+    }
+    fn new() -> Shell {
+        Shell {
+            term: console::Term::stdout(),
+            path: std::env::var("PATH").unwrap_or("./".to_owned()),
+            current_directory: get_dir(),
+            cache: Vec::new(),
+            input: String::new(),
+            suggestion: String::new(),
+            highlighting: false,
+            showing_entries: false,
+            highlighted_entry: (0, 0),
+            index: 0,
+            pos: 0,
+        }
     }
 }
 
@@ -227,4 +262,23 @@ fn get_dir() -> String {
         .last()
         .unwrap()
         .to_string()
+}
+fn dir_filtered_index(input: String, dir: ReadDir, entry: usize) -> OsString {
+    dir_filter(input, dir)
+        .get(entry)
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .file_name()
+}
+fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
+    dir.filter(|x| {
+        x.as_ref()
+            .unwrap()
+            .file_name()
+            .into_string()
+            .unwrap()
+            .starts_with(&input.split(" ").last().unwrap())
+    })
+    .collect::<Vec<Result<DirEntry, Error>>>()
 }
