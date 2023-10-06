@@ -1,18 +1,65 @@
 use std::{
     env,
+    fs::DirEntry,
     io::{Error, Write},
     path::Path,
     process::Command,
 };
 
 fn main() -> Result<(), Error> {
-    let mut cache: Vec<String> = Vec::new();
+    let (mut cache, mut input) = (Vec::<String>::new(), String::new());
+    let (mut highlighting, mut highlighted_entry) = (false, (0, 0));
+    let (mut index, mut pos) = (0, 0);
     let mut term = console::Term::stdout();
-    let mut input = String::new();
-    let mut index = 0;
-    let mut pos = 0;
     let mut current_directory = get_dir();
+    let mut showing_entries = false;
     loop {
+        if showing_entries {
+            let dir = std::fs::read_dir("./")?;
+            let entries = dir
+                .filter(|x| {
+                    x.as_ref()
+                        .unwrap()
+                        .file_name()
+                        .into_string()
+                        .unwrap()
+                        .starts_with(&input.split(" ").last().unwrap())
+                })
+                .collect::<Vec<Result<DirEntry, Error>>>();
+            let len = entries.len();
+            if len != 0 {
+                term.write_all(b"\n")?;
+                term.clear_line()?;
+                let mut pos = 0;
+                entries.into_iter().for_each(|x| {
+                    let mut entry = x.unwrap().file_name().into_string().unwrap();
+                    match highlighting {
+                        false => {
+                            entry.insert_str(input.len(), "\x1b[0;37m");
+                            term.write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
+                                .unwrap()
+                        }
+                        true => {
+                            if pos == highlighted_entry.0 - 1 {
+                                term.write_all(
+                                    format!("\x1b[30;46m{}\x1b[30;40m ", entry).as_bytes(),
+                                )
+                                .unwrap();
+                            } else {
+                                entry.insert_str(input.len(), "\x1b[0;37m");
+                                term.write_all(format!("\x1b[4;36m{} ", entry).as_bytes())
+                                    .unwrap()
+                            }
+                        }
+                    }
+                    pos += 1;
+                });
+                if highlighted_entry.0 > len - 1 {
+                    highlighted_entry.0 = 0;
+                }
+                term.move_cursor_up(1)?;
+            }
+        }
         term.clear_line()?;
         term.write_all(
             format!(
@@ -29,12 +76,32 @@ fn main() -> Result<(), Error> {
                 term.write_all(x.to_string().as_bytes())?;
                 input.insert(pos, x);
                 pos += 1;
+                if showing_entries {
+                    term.move_cursor_down(1)?;
+                    term.clear_line()?;
+                    term.move_cursor_up(1)?;
+                    (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
+                }
+            }
+            console::Key::Tab => {
+                if !showing_entries {
+                    showing_entries = true;
+                } else {
+                    highlighting = true;
+                    highlighted_entry.0 += 1;
+                }
             }
             console::Key::Backspace => {
                 if pos != 0 {
                     input.remove(pos - 1);
                     term.clear_chars(1)?;
                     pos -= 1;
+                }
+                if showing_entries {
+                    term.move_cursor_down(1)?;
+                    term.clear_line()?;
+                    term.move_cursor_up(1)?;
+                    (showing_entries, highlighting, highlighted_entry.0) = (false, false, 0);
                 }
             }
             console::Key::ArrowUp => {
