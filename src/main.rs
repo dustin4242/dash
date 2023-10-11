@@ -110,26 +110,15 @@ impl Shell {
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
                 }
-                if self.input.trim_end() != "" {
-                    self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
-                } else {
-                    self.suggestion = String::new();
-                }
             }
             console::Key::Tab => {
                 if self.highlighting {
                     self.highlighted_entry.0 += 1;
                 }
-                if self.suggestion.trim() == "" {
-                    if !self.showing_entries {
-                        self.showing_entries = true;
-                    } else {
-                        self.highlighting = true;
-                    }
+                if !self.showing_entries {
+                    self.showing_entries = true;
                 } else {
-                    self.input = format!("{}{}", self.input, self.suggestion);
-                    self.pos += self.suggestion.len();
-                    self.suggestion = String::new();
+                    self.highlighting = true;
                 }
             }
             console::Key::Backspace => {
@@ -147,11 +136,6 @@ impl Shell {
                         self.highlighting,
                         self.highlighted_entry.0,
                     ) = (false, false, 0);
-                }
-                if self.input.trim_end() != "" {
-                    self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
-                } else {
-                    self.suggestion = String::new();
                 }
             }
             console::Key::ArrowUp => {
@@ -186,6 +170,10 @@ impl Shell {
             console::Key::ArrowRight => {
                 if self.pos != self.input.len() {
                     self.pos += 1;
+                } else {
+                    self.input = format!("{}{}", self.input, self.suggestion);
+                    self.pos += self.suggestion.len();
+                    self.suggestion = String::new();
                 }
             }
             console::Key::Enter => {
@@ -257,6 +245,11 @@ impl Shell {
             }
             _ => (),
         };
+        if self.input.trim_end() != "" && self.pos != self.input.len() - 1 {
+            self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
+        } else {
+            self.suggestion = String::new();
+        }
     }
     fn new() -> Shell {
         Shell {
