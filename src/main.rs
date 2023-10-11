@@ -30,13 +30,24 @@ struct Shell {
 impl Shell {
     fn tick(&mut self) {
         if self.showing_entries {
-            let dir = std::fs::read_dir("./").unwrap();
+            let mut autodir = self
+                .input
+                .split(" ")
+                .last()
+                .unwrap()
+                .split("/")
+                .collect::<Vec<&str>>();
+            autodir.pop();
+            autodir.insert(0, ".");
+            let dir =
+                std::fs::read_dir(autodir.join("/")).unwrap_or(std::fs::read_dir("./").unwrap());
             let entries = dir_filter(self.input.to_owned(), dir);
             let len = entries.len();
             if len != 0 {
                 self.term.write_all(b"\n").unwrap();
                 self.term.clear_line().unwrap();
-                let temp_input = self.input.split(" ").last().unwrap();
+                let mut temp_input = self.input.split(" ").last().unwrap();
+                temp_input = temp_input.split("/").last().unwrap();
                 let mut pos = 0;
                 if self.highlighted_entry.0 == len {
                     self.highlighted_entry.0 = 0;
@@ -184,10 +195,23 @@ impl Shell {
                     self.suggestion = String::new();
                     let mut temp_input = self.input.split(" ").collect::<Vec<&str>>();
                     temp_input.pop();
-                    let dir = std::fs::read_dir("./").unwrap();
+                    let mut autodir = self
+                        .input
+                        .split(" ")
+                        .last()
+                        .unwrap()
+                        .split("/")
+                        .collect::<Vec<&str>>();
+                    autodir.pop();
+                    autodir.insert(0, ".");
+                    let dir = std::fs::read_dir(autodir.join("/"))
+                        .unwrap_or(std::fs::read_dir("./").unwrap());
                     let entry =
                         dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
-                    temp_input.push(entry.to_str().unwrap());
+                    autodir.push(entry.to_str().unwrap());
+                    autodir.remove(0);
+                    let temp = autodir.join("/");
+                    temp_input.push(&temp);
                     self.input = temp_input.join(" ");
                     self.pos = self.input.len();
                     (
@@ -295,7 +319,7 @@ fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
             .file_name()
             .into_string()
             .unwrap()
-            .starts_with(&input.split(" ").last().unwrap())
+            .starts_with(&input.split(" ").last().unwrap().split("/").last().unwrap())
     })
     .collect::<Vec<Result<DirEntry, Error>>>()
 }
@@ -326,10 +350,12 @@ fn get_suggestion(path: String, input: String) -> String {
         != String::new()
     {
         let possible = possible_suggestions.get(0).unwrap().to_owned();
-        return possible
-            .get(input.split(" ").last().unwrap().len()..possible.len())
-            .unwrap()
-            .to_string();
+        return if let Some(x) = possible.get(input.split(" ").last().unwrap().len()..possible.len())
+        {
+            x.to_string()
+        } else {
+            String::new()
+        };
     } else {
         return String::new();
     }
