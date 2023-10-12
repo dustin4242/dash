@@ -1,7 +1,6 @@
 use std::{
     env,
-    ffi::OsString,
-    fs::{DirEntry, FileType, ReadDir},
+    fs::{DirEntry, ReadDir},
     io::{Error, Write},
     path::Path,
     process::Command,
@@ -171,7 +170,10 @@ impl Shell {
                 self.highlighted_entry.0 = 0;
             }
             entries.into_iter().for_each(|x| {
-                let mut entry = x.unwrap().file_name().into_string().unwrap();
+                let mut entry = match x.as_ref().unwrap().file_type().unwrap().is_dir() {
+                    true => x.unwrap().file_name().into_string().unwrap() + "/",
+                    false => x.unwrap().file_name().into_string().unwrap(),
+                };
                 match self.highlighting {
                     false => {
                         entry.insert_str(temp_input.len(), "\x1b[0;37m");
@@ -213,7 +215,7 @@ impl Shell {
         let mut autodir = self.get_dir_vec();
         let dir = std::fs::read_dir(autodir.join("/")).unwrap_or(std::fs::read_dir("./").unwrap());
         let entry = dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
-        autodir.push(entry.to_str().unwrap());
+        autodir.push(entry.as_str());
         autodir.remove(0);
         let temp = autodir.join("/");
         temp_input.push(&temp);
@@ -309,13 +311,13 @@ fn get_current_dir() -> String {
         .unwrap()
         .to_string()
 }
-fn dir_filtered_index(input: String, dir: ReadDir, entry: usize) -> OsString {
-    dir_filter(input, dir)
-        .get(entry)
-        .unwrap()
-        .as_ref()
-        .unwrap()
-        .file_name()
+fn dir_filtered_index(input: String, dir: ReadDir, entry: usize) -> String {
+    let filter = dir_filter(input, dir);
+    let entry = filter.get(entry).unwrap().as_ref().unwrap();
+    match entry.file_type().unwrap().is_dir() {
+        true => entry.file_name().into_string().unwrap() + "/",
+        false => entry.file_name().into_string().unwrap(),
+    }
 }
 fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
     dir.filter(|x| {
