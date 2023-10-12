@@ -4,4 +4,5 @@
 
 Simple Installation:
 ```sh
-cargo install dash-shell```
+cargo install dash-shell
+```
