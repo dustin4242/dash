@@ -1,7 +1,7 @@
 use std::{
     env,
     ffi::OsString,
-    fs::{DirEntry, ReadDir},
+    fs::{DirEntry, FileType, ReadDir},
     io::{Error, Write},
     path::Path,
     process::Command,
@@ -340,7 +340,10 @@ fn get_suggestion(path: String, input: String) -> String {
                 .unwrap()
         });
         let value = match filtered.get(0) {
-            Some(x) => x.as_ref().unwrap().file_name().into_string().unwrap(),
+            Some(x) => match x.as_ref().unwrap().file_type().unwrap().is_dir() {
+                true => x.as_ref().unwrap().file_name().into_string().unwrap() + "/",
+                false => x.as_ref().unwrap().file_name().into_string().unwrap(),
+            },
             None => String::new(),
         };
         if value != String::new() {
