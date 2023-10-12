@@ -128,8 +128,8 @@ impl Shell {
                 if self.pos != self.input.len() {
                     self.pos += 1;
                 } else {
-                    self.input = format!("{}{}", self.input, self.suggestion);
-                    self.pos += self.suggestion.len();
+                    self.input = format!("{}{}", self.input, self.suggestion.replace(" ", "\\s"));
+                    self.pos += self.suggestion.replace(" ", "\\s").len();
                     self.suggestion = String::new();
                 }
             }
@@ -161,7 +161,8 @@ impl Shell {
     }
     fn show_tab_entries(&mut self) {
         let autodir = self.get_dir_vec();
-        let dir = std::fs::read_dir(autodir.join("/")).unwrap_or(std::fs::read_dir("./").unwrap());
+        let dir = std::fs::read_dir(autodir.join("/").replace("\\s", " "))
+            .unwrap_or(std::fs::read_dir("./").unwrap());
         let entries = dir_filter(self.input.to_owned(), dir);
         let len = entries.len();
         if len != 0 {
@@ -217,7 +218,8 @@ impl Shell {
         let mut temp_input = self.input.split(" ").collect::<Vec<&str>>();
         temp_input.pop();
         let mut autodir = self.get_dir_vec();
-        let dir = std::fs::read_dir(autodir.join("/")).unwrap_or(std::fs::read_dir("./").unwrap());
+        let dir = std::fs::read_dir(autodir.join("/").replace("\\s", " "))
+            .unwrap_or(std::fs::read_dir("./").unwrap());
         let mut entry = dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
         if entry.contains(" ") {
             entry = entry.replace(" ", "\\s");
@@ -267,7 +269,6 @@ impl Shell {
                     .peek()
                     .map_or("/", |x| x)
                     .replace("\\s", " ");
-                println!("{new_dir}");
                 let root = Path::new(&new_dir);
                 if let Err(e) = env::set_current_dir(&root) {
                     eprintln!("{}", e);
