@@ -1,4 +1,4 @@
 # Dustin's Awesome Shell Handler
 
 Simple Installation:
-`cargo install dash`
+`cargo install dash-shell`

@@ -1,5 +1,5 @@
 [package]
-name = "dash"
+name = "dash-shell"
 version = "0.1.0"
 edition = "2021"
 description = "Dustin's Awesome Shell Handler"
