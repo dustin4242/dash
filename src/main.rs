@@ -42,7 +42,9 @@ impl Shell {
                 .as_bytes(),
             )
             .unwrap();
-        self.term.write_all(self.input.as_bytes()).unwrap();
+        self.term
+            .write_all(self.input.replace("\\s", "\\ ").as_bytes())
+            .unwrap();
         self.term
             .write_all(format!("\x1b[38;5;240m{}\x1b[37m", self.suggestion).as_bytes())
             .unwrap();
@@ -144,8 +146,10 @@ impl Shell {
             _ => (),
         };
         if self.input.trim_end() != "" && self.pos != self.input.len() - 1 {
-            let current_dir_suggestion =
-                get_suggestion(self.get_dir_vec().join("/"), self.input.to_owned());
+            let current_dir_suggestion = get_suggestion(
+                self.get_dir_vec().join("/").replace("\\s", " "),
+                self.input.to_owned(),
+            );
             if current_dir_suggestion.is_empty() && !self.input.trim_start().contains(" ") {
                 self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
             } else {
@@ -214,7 +218,10 @@ impl Shell {
         temp_input.pop();
         let mut autodir = self.get_dir_vec();
         let dir = std::fs::read_dir(autodir.join("/")).unwrap_or(std::fs::read_dir("./").unwrap());
-        let entry = dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
+        let mut entry = dir_filtered_index(self.input.to_owned(), dir, self.highlighted_entry.0);
+        if entry.contains(" ") {
+            entry = entry.replace(" ", "\\s");
+        }
         autodir.push(entry.as_str());
         autodir.remove(0);
         let temp = autodir.join("/");
@@ -227,6 +234,18 @@ impl Shell {
             self.highlighted_entry.0,
         ) = (false, false, 0);
     }
+    fn get_dir_vec(&self) -> Vec<&str> {
+        let mut autodir = self
+            .input
+            .split(" ")
+            .last()
+            .unwrap()
+            .split("/")
+            .collect::<Vec<&str>>();
+        autodir.pop();
+        autodir.insert(0, ".");
+        autodir
+    }
     fn run_command(&mut self) {
         self.index = 0;
         self.pos = 0;
@@ -234,9 +253,8 @@ impl Shell {
         self.term.clear_chars(self.suggestion.len()).unwrap();
         self.suggestion = String::new();
         self.term.write_all(b"\n").unwrap();
-        let mut parts = self.input.trim().split_whitespace();
-        let command = parts.next().unwrap_or("");
-        let args = parts;
+        let mut args = self.input.trim().split_whitespace();
+        let command = args.next().unwrap_or("");
         if self.cache.get(0).unwrap_or(&"".to_owned()) != &self.input.to_owned() || self.input != ""
         {
             self.cache.insert(0, self.input.to_owned());
@@ -244,8 +262,13 @@ impl Shell {
         match command {
             "" => (),
             "cd" => {
-                let new_dir = args.peekable().peek().map_or("/", |x| x);
-                let root = Path::new(new_dir);
+                let new_dir = args
+                    .peekable()
+                    .peek()
+                    .map_or("/", |x| x)
+                    .replace("\\s", " ");
+                println!("{new_dir}");
+                let root = Path::new(&new_dir);
                 if let Err(e) = env::set_current_dir(&root) {
                     eprintln!("{}", e);
                 }
@@ -269,18 +292,6 @@ impl Shell {
             }
         }
         self.input = String::new();
-    }
-    fn get_dir_vec(&self) -> Vec<&str> {
-        let mut autodir = self
-            .input
-            .split(" ")
-            .last()
-            .unwrap()
-            .split("/")
-            .collect::<Vec<&str>>();
-        autodir.pop();
-        autodir.insert(0, ".");
-        autodir
     }
     fn new() -> Shell {
         Shell {
@@ -326,7 +337,16 @@ fn dir_filter(input: String, dir: ReadDir) -> Vec<Result<DirEntry, Error>> {
             .file_name()
             .into_string()
             .unwrap()
-            .starts_with(&input.split(" ").last().unwrap().split("/").last().unwrap())
+            .starts_with(
+                &input
+                    .split(" ")
+                    .last()
+                    .unwrap()
+                    .split("/")
+                    .last()
+                    .unwrap()
+                    .replace("\\s", " "),
+            )
     })
     .collect::<Vec<Result<DirEntry, Error>>>()
 }
@@ -368,6 +388,7 @@ fn get_suggestion(path: String, input: String) -> String {
                 .split("/")
                 .last()
                 .unwrap()
+                .replace("\\s", "\\ ")
                 .len()..possible.len(),
         ) {
             x.to_string()
