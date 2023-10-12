@@ -147,7 +147,7 @@ impl Shell {
         if self.input.trim_end() != "" && self.pos != self.input.len() - 1 {
             let current_dir_suggestion =
                 get_suggestion(self.get_dir_vec().join("/"), self.input.to_owned());
-            if current_dir_suggestion.is_empty() {
+            if current_dir_suggestion.is_empty() && !self.input.trim_start().contains(" ") {
                 self.suggestion = get_suggestion(self.path.to_owned(), self.input.to_owned());
             } else {
                 self.suggestion = current_dir_suggestion;
